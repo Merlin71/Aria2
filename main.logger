@@ -1,8 +1,8 @@
 [loggers]
-keys=root,moduleTTS,schedule,moduleSTT
+keys=root,moduleTTS,moduleSTT,Audio
 
 [handlers]
-keys=consoleHandler,moduleTTS,schedule,moduleSTT
+keys=consoleHandler,moduleTTS,moduleSTT
 
 [formatters]
 keys=consoleFormatter
@@ -11,11 +11,11 @@ keys=consoleFormatter
 level=DEBUG
 handlers=consoleHandler
 
-[logger_schedule]
+[logger_Audio]
 level=INFO
 handlers=consoleHandler
 propagate=0
-qualname=schedule
+qualname=Audio
 
 [logger_moduleTTS]
 level=DEBUG
@@ -35,7 +35,7 @@ level=DEBUG
 formatter=consoleFormatter
 args=(sys.stdout,)
 
-[handler_schedule]
+[handler_Audio]
 class=StreamHandler
 level=INFO
 formatter=consoleFormatter

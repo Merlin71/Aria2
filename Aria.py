@@ -109,15 +109,18 @@ def aria_start():
                 try:
                     _logger.info('Loading module %s from %s' % (elem, modulename))
                     _module = obj()
-                    _loaded_modules.append(_module)
-                    _logger.info('Module %s (version: %s) loaded' % (elem, _module.version))
                 except ImportWarning:
                     _logger.warning('Failed to load %s from %s' % (elem, modulename))
+                    del _module
+                else:
+                    _loaded_modules.append(_module)
+                    _logger.info('Module %s (version: %s) loaded' % (elem, _module.version))
     sleep(5)  # Init time
     _logger.info('All modules loaded')
 
     dispatcher.send(signal='SayText', text='System ready.')
     dispatcher.send(signal='SayText', text='Hi my name is Aria. Feel free to ask anything')
+    dispatcher.connect(test, signal='HotWordDetected')
     try:
         while True:
             #  We will wait here until shutdown
