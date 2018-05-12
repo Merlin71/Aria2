@@ -9,7 +9,7 @@ import keyring
 import uuid
 import json
 import threading
-from time import  sleep
+from time import sleep
 
 from wit import Wit
 
@@ -66,6 +66,11 @@ class STT:
         except dispatcher.DispatcherTypeError as e:
             self._logger.error('Fail to subscribe on "RestartInteraction" event with error %s.Module unload' % e)
             raise ImportError
+        try:
+            dispatcher.connect(self.speech_data_accepted, signal='SpeechAccepted', sender=dispatcher.Any)
+        except dispatcher.DispatcherTypeError as e:
+            self._logger.error('Fail to subscribe on "RestartInteraction" event with error %s.Module unload' % e)
+            raise ImportError
 
     def __del__(self):
         pass
@@ -86,6 +91,9 @@ class STT:
         dispatcher.send(signal='RecordFile', filename=record_filename, callback=self.wav_analyze)
 
     def wav_analyze(self, filename):
+        threading.Thread(target=self._wav_analyze, args=(filename,)).start()
+
+    def _wav_analyze(self, filename):
         self._logger.debug('File record complete - filename %s' % filename)
         dispatcher.send(signal='SayResponse', response='Processing')
         # TODO - Remove silence
@@ -101,17 +109,25 @@ class STT:
             dispatcher.send(signal='SayResponse', response='Unclear')
             dispatcher.send(signal='RestartInteraction')
         else:
-            self._logger.debug('Recognized speech response %s ' % resp)
+            self._logger.debug('Recognized speech %s ' % resp)
             self._logger.debug('Got entities %s ' % resp['entities'])
-            # Wait to end of processing
             self._processing_accepted.clear()
+            dispatcher.send(signal='SpeechRecognize', entities=resp['entities'], raw_text=resp['_text'])
+            # Wait to end of processing
             sleep(5)
-            if not self._processing_accepted.wait(timeout=10):
+            test = self._processing_accepted.wait(timeout=10)
+            print test
+            if test:
+                self._logger.debug("Response received")
+            else:
                 self._logger.warning('No response from any module')
                 dispatcher.send(signal='SayResponse', response='Unclear')
-                sleep(2)
+                sleep(5)
                 dispatcher.send(signal='RestartInteraction')
 
     def restart_interaction(self):
         self._logger.debug('Restarting hot word detection')
         dispatcher.send(signal='WaitToHotWord')
+
+    def speech_data_accepted(self):
+        self._processing_accepted.set()

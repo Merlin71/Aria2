@@ -99,6 +99,9 @@ class AudioSubSystem:
         if self._exit_flag.is_set():
             self._logger.warning('Shutdown flag set. Ignoring start command')
             return
+        if self._hot_word_detection_active.isSet():
+            self._logger.warning('Recognizing already running. Ignoring')
+            return
         self._logger.info('Starting Hot word detection')
         try:
             threading.Thread(target=self._start_hot_word_detection, args=(delay,)).start()
@@ -127,12 +130,12 @@ class AudioSubSystem:
             if line != '':
                 for word in self._hot_words:
                     if word in line:
+                        _recognize_process.terminate()
                         self._logger.info('Hot word %s detected in input %s' % (word, line))
                         self._logger.info('Stop recognition process')
                         dispatcher.send(signal='HotWordDetected', text=word)
                         dispatcher.send(signal='HotWordDetectionActive', status=False)
                         self._hot_word_detection_active.clear()
-                        _recognize_process.terminate()
                         return
 
     def play_file(self, filename, delay=None, callback=None):

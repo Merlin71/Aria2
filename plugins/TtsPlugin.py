@@ -101,7 +101,7 @@ class TTS:
 
     ## @brief Send text into text2wav instance
     ## @param[in] text Text to say
-    def text2wav(self, sender, text):
+    def text2wav(self, sender, text, callback=None):
         self._logger.debug('Received text "%s" from module:%s' % (text, sender))
         text_hash = hashlib.sha1(text).hexdigest()
         wave_file = os.path.join(self._cache_folder, text_hash + '.wav')
@@ -132,7 +132,7 @@ class TTS:
         else:
             self._synthesize(text_hash, wave_file, text)
 
-        dispatcher.send(signal='PlayFile', filename=wave_file)
+        dispatcher.send(signal='PlayFile', filename=wave_file, callback=callback)
 
     def _synthesize(self, text_file, wave_file, text):
         self._logger.debug('Synthesize text "%s" using text file %s into wave file %s' %

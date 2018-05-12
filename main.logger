@@ -1,8 +1,8 @@
 [loggers]
-keys=root,moduleTTS,moduleSTT,Audio
+keys=root,moduleTTS,moduleSTT,Audio,moduleJoke
 
 [handlers]
-keys=consoleHandler,moduleTTS,moduleSTT
+keys=consoleHandler,moduleTTS,moduleSTT,moduleJoke
 
 [formatters]
 keys=consoleFormatter
@@ -28,6 +28,12 @@ level=DEBUG
 handlers=consoleHandler
 propagate=0
 qualname=moduleSTT
+
+[logger_moduleJoke]
+level=DEBUG
+handlers=consoleHandler
+propagate=0
+qualname=moduleJoke
 #########################################################################
 [handler_consoleHandler]
 class=StreamHandler
@@ -48,6 +54,12 @@ formatter=consoleFormatter
 args=(sys.stdout,)
 
 [handler_moduleSTT]
+class=StreamHandler
+level=DEBUG
+formatter=consoleFormatter
+args=(sys.stdout,)
+
+[handler_moduleJoke]
 class=StreamHandler
 level=DEBUG
 formatter=consoleFormatter
