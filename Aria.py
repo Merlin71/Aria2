@@ -10,6 +10,7 @@ import logging.config
 import os
 import sys
 from time import sleep
+import threading
 
 import pydevd
 from pydispatch import dispatcher
@@ -74,9 +75,13 @@ def aria_start():
     try:
         disable_modules = _config.get('Modules', 'Disabled')
         disable_modules = disable_modules.strip().split(',')
-    except:
-        disable_modules = []
+        disable_classes = _config.get('Classes', 'Disabled')
+        disable_classes = disable_classes.strip().split(',')
+    except ConfigParser as e:
+        _logger.fatal('Fail to read config file with error %s' % e)
+        exit(-1)
     _logger.info('Disabled modules : %s' % disable_modules)
+    _logger.info('Disabled classes : %s' % disable_classes)
 
     if not os.path.exists(plugin_dir):
         _logger.critical('Plugins folder not exist')
@@ -105,6 +110,9 @@ def aria_start():
             obj = getattr(module_obj, elem)
             # If this a class ?
             if inspect.isclass(obj):
+                if elem in disable_classes:
+                    _logger.info('Skipping %s' % obj)
+                    continue
                 # Creating object
                 try:
                     _logger.info('Loading module %s from %s' % (elem, modulename))
@@ -112,19 +120,20 @@ def aria_start():
                 except ImportWarning:
                     _logger.warning('Failed to load %s from %s' % (elem, modulename))
                     del _module
+                    pass
                 else:
                     _loaded_modules.append(_module)
                     _logger.info('Module %s (version: %s) loaded' % (elem, _module.version))
     sleep(5)  # Init time
     _logger.info('All modules loaded')
-
-    dispatcher.send(signal='SayText', text='System ready.')
-    dispatcher.send(signal='SayText', text='Hi my name is Aria. Feel free to ask anything')
-    dispatcher.connect(test, signal='HotWordDetected')
+    dispatcher.connect(emergency_shutdown, signal='EmergencyShutdown')
+    dispatcher.send(signal='SayResponse', response='Welcome')
     try:
         while True:
             #  We will wait here until shutdown
             sleep(1)
+            if shutdown_flag.isSet():
+                break
     except KeyboardInterrupt:
         _logger.warning("Keyboard Interrupt received")
     except SystemExit:
@@ -139,5 +148,11 @@ def aria_start():
     _logger.info("All module unloaded")
 
 
+def emergency_shutdown():
+    shutdown_flag.set()
+
+
 if __name__ == '__main__':
+    # Shutdown flag
+    shutdown_flag = threading.Event()
     aria_start()

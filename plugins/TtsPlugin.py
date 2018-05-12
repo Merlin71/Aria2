@@ -7,6 +7,7 @@ import os
 import hashlib
 from time import time
 from pydispatch import dispatcher
+import random
 
 
 ## @class TTS
@@ -70,6 +71,11 @@ class TTS:
             dispatcher.connect(self.text2wav, signal='SayText', sender=dispatcher.Any)
         except dispatcher.DispatcherTypeError as e:
             self._logger.error('Fail to subscribe on "SayText" event with error %s.Module unload' % e)
+            raise ImportError
+        try:
+            dispatcher.connect(self.response, signal='SayResponse', sender=dispatcher.Any)
+        except dispatcher.DispatcherTypeError as e:
+            self._logger.error('Fail to subscribe on "SayResponse" event with error %s.Module unload' % e)
             raise ImportError
         self._logger.info('TTS module ready')
 
@@ -146,4 +152,12 @@ class TTS:
             self._logger.debug('Voice synthesis complete. Synthesis time %s sec' % (time() - start_time))
         except OSError as e:
             self._logger.error('Fail to communicate with TTS engine.Error : %s' % e)
+
+    def response(self, response):
+        try:
+            response = self._config.get('Response', response)
+        except ConfigParser as e:
+            self._logger.warning('Fail to retrieve response %s with error %s' % (response, e))
+        
+        dispatcher.send(signal='SayText', text=random.choice(response.split(';')))
 

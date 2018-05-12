@@ -53,7 +53,7 @@ class AudioSubSystem:
             playback_log_redirect = self._config.get('Playback', 'log_redirect')
             self._playback_engine = shlex.split(playback_engine + ' ' + playback_option + ' ' + playback_log_redirect)
 
-            record_engine = playback_engine = self._config.get('Record', 'engine')
+            record_engine = self._config.get('Record', 'engine')
             record_option = self._config.get('Record', 'options')
             record_log_redirect = self._config.get('Record', 'log_redirect')
             self._max_record_time = self._config.get('Record', 'max_record_time')
@@ -109,16 +109,19 @@ class AudioSubSystem:
         if delay is not None:
             sleep(delay)
         self._logger.info('Starting recognize process')
+        dispatcher.send(signal='HotWordDetectionActive', status=True)
         _recognize_process = subprocess.Popen(self._recognition_engine, stdout=subprocess.PIPE)
         self._hot_word_detection_active.set()
         while not self._exit_flag.isSet():
             line = _recognize_process.stdout.readline().replace('\n', ' ').replace('\r', '')
             if self._io_system_busy.isSet():
                 self._logger.info('Playback started.Stop recognition process')
+                dispatcher.send(signal='HotWordDetectionActive', status=False)
                 _recognize_process.terminate()
                 self._hot_word_detection_active.clear()
                 while self._io_system_busy.isSet():
                     sleep(1)
+                dispatcher.send(signal='HotWordDetectionActive', status=True)
                 _recognize_process = subprocess.Popen(self._recognition_engine, stdout=subprocess.PIPE)
                 self._hot_word_detection_active.set()
             if line != '':
@@ -127,6 +130,7 @@ class AudioSubSystem:
                         self._logger.info('Hot word %s detected in input %s' % (word, line))
                         self._logger.info('Stop recognition process')
                         dispatcher.send(signal='HotWordDetected', text=word)
+                        dispatcher.send(signal='HotWordDetectionActive', status=False)
                         self._hot_word_detection_active.clear()
                         _recognize_process.terminate()
                         return
@@ -154,10 +158,12 @@ class AudioSubSystem:
         while self._hot_word_detection_active.isSet():
             sleep(1)
         try:
+            dispatcher.send(signal='PlaybackActive', status=True)
             subprocess.call([s.replace('$file$', filename) for s in self._playback_engine])
         except OSError as e:
             self._logger.error('Fail to play file %s with error %s' % (filename, e))
         finally:
+            dispatcher.send(signal='PlaybackActive', status=False)
             self._io_system_busy.clear()
             
         if callable(callback):
@@ -193,11 +199,13 @@ class AudioSubSystem:
         try:
             call_command = [s.replace('$file$', filename) for s in self._record_engine]
             call_command = [s.replace('$time$', record_time) for s in call_command]
+            dispatcher.send(signal='RecordActive', status=True)
             subprocess.call(call_command)
         except OSError as e:
             self._logger.error('Fail to record file %s with error %s' % (filename, e))
         finally:
             self._io_system_busy.clear()
+            dispatcher.send(signal='RecordActive', status=False)
 
         if callable(callback):
-            callback()
+            callback(filename)
