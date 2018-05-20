@@ -135,6 +135,7 @@ class TTS:
         dispatcher.send(signal='PlayFile', filename=wave_file, callback=callback)
 
     def _synthesize(self, text_file, wave_file, text):
+        dispatcher.send(signal='SpeechSynthesize', status=True)
         self._logger.debug('Synthesize text "%s" using text file %s into wave file %s' %
                            (text, text_file, wave_file))
         # Write new text file
@@ -144,6 +145,7 @@ class TTS:
             f.close()
         except IOError as e:
             self._logger.error('Fail create speech file.Error : %s' % e)
+            dispatcher.send(signal='SpeechSynthesize', status=False)
         # Synthesize new wave file
         try:
             self._logger.debug('Start voice synthesis')
@@ -152,6 +154,8 @@ class TTS:
             self._logger.debug('Voice synthesis complete. Synthesis time %s sec' % (time() - start_time))
         except OSError as e:
             self._logger.error('Fail to communicate with TTS engine.Error : %s' % e)
+        finally:
+            dispatcher.send(signal='SpeechSynthesize', status=False)
 
     def response(self, response):
         try:
