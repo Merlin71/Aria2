@@ -1,8 +1,8 @@
 [loggers]
-keys=root,moduleTTS,moduleSTT,Audio,moduleJoke
+keys=root,moduleTTS,moduleSTT,Audio,moduleJoke,moduleWeather
 
 [handlers]
-keys=consoleHandler,moduleTTS,moduleSTT,moduleJoke
+keys=consoleHandler,moduleTTS,moduleSTT,moduleJoke,moduleWeather
 
 [formatters]
 keys=consoleFormatter
@@ -34,6 +34,12 @@ level=DEBUG
 handlers=consoleHandler
 propagate=0
 qualname=moduleJoke
+
+[logger_moduleWeather]
+level=DEBUG
+handlers=consoleHandler
+propagate=0
+qualname=moduleWeather
 #########################################################################
 [handler_consoleHandler]
 class=StreamHandler
@@ -60,6 +66,12 @@ formatter=consoleFormatter
 args=(sys.stdout,)
 
 [handler_moduleJoke]
+class=StreamHandler
+level=DEBUG
+formatter=consoleFormatter
+args=(sys.stdout,)
+
+[handler_moduleWeather]
 class=StreamHandler
 level=DEBUG
 formatter=consoleFormatter
