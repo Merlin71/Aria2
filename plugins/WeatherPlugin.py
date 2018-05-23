@@ -96,6 +96,7 @@ class Weather:
         weather_data.units = self._units
         weather_data.icon_folder = self._temp_folder
         weather_data.city_name = self._main_city
+        time.sleep(15)
         while True:
             self._logger.debug("Requesting periodic update for city %s" % weather_data.city_name)
             weather_data.update()

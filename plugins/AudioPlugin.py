@@ -5,6 +5,7 @@ import logging
 import subprocess
 import threading
 import shlex
+import subprocess
 from time import sleep
 from pydispatch import dispatcher
 
@@ -137,6 +138,10 @@ class AudioSubSystem:
                         dispatcher.send(signal='HotWordDetectionActive', status=False)
                         self._hot_word_detection_active.clear()
                         return
+                    if "EMERGENCY SHUTDOWN" in line:
+                        self._logger.warning("EMERGENCY SHUTDOWN")
+                        bashCommand = "killall python"
+                        subprocess.Popen(bashCommand.split())
 
     def play_file(self, filename, delay=None, callback=None):
         if self._exit_flag.is_set():
