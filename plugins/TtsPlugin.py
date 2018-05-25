@@ -8,7 +8,7 @@ import hashlib
 from time import time
 from pydispatch import dispatcher
 import random
-
+from uuid import uuid4
 
 ## @class TTS
 ## @brief Test To Speech abstraction
@@ -28,6 +28,7 @@ class TTS:
     ## @brief Create TTS instance
     ## @details Create TTS instance
     def __init__(self):
+        self.gui_synthesis_status_uuid = str(uuid4())
         # Load logger
         try:
             self._logger = logging.getLogger('moduleTTS')
@@ -136,6 +137,7 @@ class TTS:
 
     def _synthesize(self, text_file, wave_file, text):
         dispatcher.send(signal='SpeechSynthesize', status=True)
+        dispatcher.send(signal='GuiNotification', source=self.gui_synthesis_status_uuid, icon_path="synthesis.png")
         self._logger.debug('Synthesize text "%s" using text file %s into wave file %s' %
                            (text, text_file, wave_file))
         # Write new text file
@@ -156,6 +158,7 @@ class TTS:
             self._logger.error('Fail to communicate with TTS engine.Error : %s' % e)
         finally:
             dispatcher.send(signal='SpeechSynthesize', status=False)
+            dispatcher.send(signal='GuiNotification', source=self.gui_synthesis_status_uuid, icon_path="")
 
     def response(self, response):
         try:

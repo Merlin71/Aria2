@@ -8,6 +8,7 @@ import shlex
 import subprocess
 from time import sleep
 from pydispatch import dispatcher
+from uuid import uuid4
 
 ## @class Audio
 ## @brief AudioSubSystem plugin
@@ -24,6 +25,8 @@ class AudioSubSystem:
         self._hot_word_detection_active = threading.Event()
         self._io_system_busy = threading.Event()
         self._exit_flag = threading.Event()
+        self.gui_speaker_status_uuid = str(uuid4())
+        self.gui_microphone_status_uuid = str(uuid4())
         # Load logger
         try:
             self._logger = logging.getLogger('Audio')
@@ -114,6 +117,9 @@ class AudioSubSystem:
             sleep(delay)
         self._logger.info('Starting recognize process')
         dispatcher.send(signal='HotWordDetectionActive', status=True)
+        dispatcher.send(signal='GuiNotification', source=self.gui_microphone_status_uuid,
+                        icon_path="microphone_passive.png")
+
         _recognize_process = subprocess.Popen(self._recognition_engine, stdout=subprocess.PIPE)
         self._hot_word_detection_active.set()
         while not self._exit_flag.isSet():
@@ -121,11 +127,15 @@ class AudioSubSystem:
             if self._io_system_busy.isSet():
                 self._logger.info('Playback started.Stop recognition process')
                 dispatcher.send(signal='HotWordDetectionActive', status=False)
+                dispatcher.send(signal='GuiNotification', source=self.gui_microphone_status_uuid,
+                                icon_path="microphone_off.png")
                 _recognize_process.terminate()
                 self._hot_word_detection_active.clear()
                 while self._io_system_busy.isSet():
                     sleep(1)
                 dispatcher.send(signal='HotWordDetectionActive', status=True)
+                dispatcher.send(signal='GuiNotification', source=self.gui_microphone_status_uuid,
+                                icon_path="microphone_passive.png")
                 _recognize_process = subprocess.Popen(self._recognition_engine, stdout=subprocess.PIPE)
                 self._hot_word_detection_active.set()
             if line != '':
@@ -136,6 +146,8 @@ class AudioSubSystem:
                         self._logger.info('Stop recognition process')
                         dispatcher.send(signal='HotWordDetected', text=word)
                         dispatcher.send(signal='HotWordDetectionActive', status=False)
+                        dispatcher.send(signal='GuiNotification', source=self.gui_microphone_status_uuid,
+                                        icon_path="microphone_off.png")
                         self._hot_word_detection_active.clear()
                         return
                     if "EMERGENCY SHUTDOWN" in line:
@@ -167,11 +179,13 @@ class AudioSubSystem:
             sleep(1)
         try:
             dispatcher.send(signal='PlaybackActive', status=True)
+            dispatcher.send(signal='GuiNotification', source=self.gui_speaker_status_uuid, icon_path="speaking.png")
             subprocess.call([s.replace('$file$', filename) for s in self._playback_engine])
         except OSError as e:
             self._logger.error('Fail to play file %s with error %s' % (filename, e))
         finally:
             dispatcher.send(signal='PlaybackActive', status=False)
+            dispatcher.send(signal='GuiNotification', source=self.gui_speaker_status_uuid, icon_path="speaker_off.png")
             self._io_system_busy.clear()
             
         if callable(callback):
@@ -208,12 +222,16 @@ class AudioSubSystem:
             call_command = [s.replace('$file$', filename) for s in self._record_engine]
             call_command = [s.replace('$time$', record_time) for s in call_command]
             dispatcher.send(signal='RecordActive', status=True)
+            dispatcher.send(signal='GuiNotification', source=self.gui_microphone_status_uuid,
+                            icon_path="microphone_record.png")
             subprocess.call(call_command)
         except OSError as e:
             self._logger.error('Fail to record file %s with error %s' % (filename, e))
         finally:
             self._io_system_busy.clear()
             dispatcher.send(signal='RecordActive', status=False)
+            dispatcher.send(signal='GuiNotification', source=self.gui_microphone_status_uuid,
+                            icon_path="microphone_off.png")
 
         if callable(callback):
             callback(filename)

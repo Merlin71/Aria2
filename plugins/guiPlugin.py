@@ -23,10 +23,9 @@ import wx
 ## @details Create GUI interface with Facebook profile pictures
 class Gui(wx.Frame):
     def __init__(self, *args, **kwds):
-        self._error_msg = threading.Event()
-        self._unclear_msg = threading.Event()
         self._shutdown = threading.Event()
         self._gui_update_lock = threading.Lock()
+        self._notification_tray = {}
         try:
             self._logger = logging.getLogger('moduleGui')
         except ConfigParser.NoSectionError as e:
@@ -57,6 +56,8 @@ class Gui(wx.Frame):
             self._ignore_albums = self._config.get('Facebook', 'Skip_albums')
             self._ignore_albums.split(';')
 
+            self._animation_active = self._config.getboolean('General', 'animation')
+
             self._temp_folder = self._config.get('General', 'temp_folder')
             if not os.path.exists(self._temp_folder):
                 try:
@@ -76,8 +77,6 @@ class Gui(wx.Frame):
         
         # Controls
         self._animation_circle_bmp = None
-        self._microphone_bmp = None
-        self._speaker_bmp = None
         self._system_response_bmp = None
 
         self._system_response_lbl = None
@@ -93,19 +92,7 @@ class Gui(wx.Frame):
 
         self._main_picture_bmp = None
 
-        # bitmaps
-        self._logger.debug('Loading image resources')
-        self.microphone_off = wx.Bitmap("./plugins/Icons/microphone_off.png", wx.BITMAP_TYPE_ANY)
-        self.microphone_on = wx.Bitmap("./plugins/Icons/microphone_passive.png", wx.BITMAP_TYPE_ANY)
-        self.microphone_record = wx.Bitmap("./plugins/Icons/microphone_record.png", wx.BITMAP_TYPE_ANY)
-
-        self.speaker_on = wx.Bitmap("./plugins/Icons/speaking.png", wx.BITMAP_TYPE_ANY)
-        self.speaker_off = wx.Bitmap("./plugins/Icons/speaker_off.png", wx.BITMAP_TYPE_ANY)
-        self.speaker_analyze = wx.Bitmap("./plugins/Icons/synthesis.png", wx.BITMAP_TYPE_ANY)
-
-        self.system_response_good = wx.Bitmap("./plugins/Icons/response_good.png", wx.BITMAP_TYPE_ANY)
-        self.system_response_bad = wx.Bitmap("./plugins/Icons/response_bad.png", wx.BITMAP_TYPE_ANY)
-        self.system_response_error = wx.Bitmap("./plugins/Icons/response_fail.png", wx.BITMAP_TYPE_ANY)
+        self._notification_slots = []
 
         self.__set_properties()
         self.__do_layout()
@@ -113,13 +100,9 @@ class Gui(wx.Frame):
         # Microphone activity
         self._logger.debug('Registering on events')
         try:
-            dispatcher.connect(self._detection_status, signal='HotWordDetectionActive', sender=dispatcher.Any)
-            dispatcher.connect(self._record_status, signal='RecordActive', sender=dispatcher.Any)
-            dispatcher.connect(self._playback_status, signal='PlaybackActive', sender=dispatcher.Any)
-            dispatcher.connect(self._synthesize_status, signal='SpeechSynthesize', sender=dispatcher.Any)
+            dispatcher.connect(self._notification, signal='GuiNotification', sender=dispatcher.Any)
             dispatcher.connect(self._system_response_text, signal='SayText', sender=dispatcher.Any)
             dispatcher.connect(self._user_request_text, signal='SpeechRecognize', sender=dispatcher.Any)
-            dispatcher.connect(self._say_status_update, signal='SayResponse', sender=dispatcher.Any)
             dispatcher.connect(self._weather_display, signal='WeatherUpdate', sender=dispatcher.Any)
         except dispatcher.DispatcherTypeError as e:
             self._logger.error('Fail to subscribe on event with error %s.Module unload' % e)
@@ -129,7 +112,10 @@ class Gui(wx.Frame):
         try:
             threading.Thread(target=self._animation_update).start()
             threading.Thread(target=self._time_update).start()
-            threading.Thread(target=self.main_pic_animation).start()
+            if self._animation_active:
+                threading.Thread(target=self.main_pic_animation).start()
+            else:
+                self._logger.info('Animation disabled')
         except Exception as e:
             self._logger.error('Fail to start thread with error %s.Module unload' % e)
             raise ImportError
@@ -158,31 +144,11 @@ class Gui(wx.Frame):
         self._animation_circle_bmp = wx.StaticBitmap(self, wx.ID_ANY, wx.Bitmap("./plugins/Icons/Load/frame-0.png", wx.BITMAP_TYPE_ANY))
         self._animation_circle_bmp.SetMinSize((25, 25))
         sizer_3.Add(self._animation_circle_bmp, 0, 0, 0)
-        self._microphone_bmp = wx.StaticBitmap(self, wx.ID_ANY, self.microphone_off)
-        self._microphone_bmp.SetMinSize((25, 25))
-        sizer_3.Add(self._microphone_bmp, 0, 0, 0)
-        self._speaker_bmp = wx.StaticBitmap(self, wx.ID_ANY, self.speaker_off)
-        self._speaker_bmp.SetMinSize((25, 25))
-        sizer_3.Add(self._speaker_bmp, 0, 0, 0)
-        bitmap_5 = wx.StaticBitmap(self, wx.ID_ANY, wx.Bitmap("./plugins/Icons/camera_off.png", wx.BITMAP_TYPE_ANY))
-        bitmap_5.SetMinSize((25, 25))
-        sizer_3.Add(bitmap_5, 0, 0, 0)
-        bitmap_6 = wx.StaticBitmap(self, wx.ID_ANY, wx.Bitmap("./plugins/Icons/calendar_free.png", wx.BITMAP_TYPE_ANY))
-        bitmap_6.SetMinSize((25, 25))
-        sizer_3.Add(bitmap_6, 0, 0, 0)
-        bitmap_7 = wx.StaticBitmap(self, wx.ID_ANY, wx.Bitmap("./plugins/Icons/email_empty.png", wx.BITMAP_TYPE_ANY))
-        bitmap_7.SetMinSize((25, 25))
-        sizer_3.Add(bitmap_7, 0, 0, 0)
-        self._animation_circle_bmp0 = wx.StaticBitmap(self, wx.ID_ANY, wx.Bitmap("./plugins/Icons/internet_bad.png", wx.BITMAP_TYPE_ANY))
-        self._animation_circle_bmp0.SetMinSize((25, 25))
-        sizer_3.Add(self._animation_circle_bmp0, 0, 0, 0)
-        sizer_3.Add((0, 0), 0, 0, 0)
-        sizer_3.Add((0, 0), 0, 0, 0)
-        sizer_3.Add((0, 0), 0, 0, 0)
-        sizer_3.Add((0, 0), 0, 0, 0)
-        self._animation_circle_bmp1 = wx.StaticBitmap(self, wx.ID_ANY, wx.Bitmap("./plugins/Icons/twitter.png", wx.BITMAP_TYPE_ANY))
-        self._animation_circle_bmp1.SetMinSize((25, 25))
-        sizer_3.Add(self._animation_circle_bmp1, 0, 0, 0)
+        for i in range(15):
+            data_slot = wx.StaticBitmap(self, wx.ID_ANY, wx.Bitmap("./plugins/Icons/empty.png", wx.BITMAP_TYPE_ANY))
+            data_slot.SetMinSize((25, 25))
+            sizer_3.Add(data_slot, 0, 0, 0)
+            self._notification_slots.append(data_slot)
         sizer_2.Add(sizer_3, 0, wx.ALIGN_CENTER | wx.EXPAND, 0)
         self._main_picture_bmp = wx.StaticBitmap(self, wx.ID_ANY,
                                                  wx.Bitmap("./plugins/Icons/login.png", wx.BITMAP_TYPE_ANY))
@@ -224,7 +190,8 @@ class Gui(wx.Frame):
         bitmap_9.SetMinSize((25, 25))
         sizer_5.Add(bitmap_9, 0, wx.EXPAND, 0)
         sizer_4.Add(sizer_5, 1, wx.EXPAND, 0)
-        self._system_response_bmp = wx.StaticBitmap(self, wx.ID_ANY, self.system_response_good)
+        self._system_response_bmp = wx.StaticBitmap(self, wx.ID_ANY,
+                                                    wx.Bitmap("./plugins/Icons/response_good.png", wx.BITMAP_TYPE_ANY))
         self._system_response_bmp.SetMinSize((25, 25))
         sizer_6.Add(self._system_response_bmp, 0, 0, 0)
         self._system_response_lbl = wx.StaticText(self, wx.ID_ANY, "", style=wx.ALIGN_LEFT)
@@ -249,6 +216,27 @@ class Gui(wx.Frame):
         time.sleep(self._clear_delay)
         wx.CallAfter(self.safe_update, func, data)
 
+    def _notification(self, source, icon_path):
+        if source in self._notification_tray:
+            if icon_path == '':
+                self._logger.debug('Removing notification from %s' % source)
+                wx.CallAfter(self.safe_update, self._notification_tray[source].SetBitmap,
+                             wx.Bitmap('./plugins/Icons/empty.png', wx.BITMAP_TYPE_ANY))
+                self._notification_slots.insert(0, self._notification_tray[source])
+                del self._notification_tray[source]
+            else:
+                self._logger.debug('Updating notification tray - source %s, icon - %s' % (source, icon_path))
+                wx.CallAfter(self.safe_update, self._notification_tray[source].SetBitmap,
+                             wx.Bitmap(os.path.join('./plugins/Icons/', icon_path), wx.BITMAP_TYPE_ANY))
+        else:
+            if len(self._notification_slots) == 0:
+                self._logger.warning('No free notification slots')
+                return
+            self._notification_tray[source] = self._notification_slots[0]
+            self._notification_slots = self._notification_slots[1:]
+            wx.CallAfter(self.safe_update, self._notification_tray[source].SetBitmap,
+                         wx.Bitmap(os.path.join('./plugins/Icons/', icon_path), wx.BITMAP_TYPE_ANY))
+            
     def _animation_update(self):
         bitmaps = []
         for single in range(30):
@@ -258,57 +246,17 @@ class Gui(wx.Frame):
                 time.sleep(self._animation_speed)
                 wx.CallAfter(self.safe_update, self._animation_circle_bmp.SetBitmap, single_frame)
 
-    def _detection_status(self, status=None):
-        if status:
-            wx.CallAfter(self.safe_update, self._microphone_bmp.SetBitmap, self.microphone_on)
-        else:
-            wx.CallAfter(self.safe_update, self._microphone_bmp.SetBitmap, self.microphone_off)
-
-    def _record_status(self, status=None):
-        if status:
-            wx.CallAfter(self.safe_update, self._microphone_bmp.SetBitmap, self.microphone_record)
-        else:
-            wx.CallAfter(self.safe_update, self._microphone_bmp.SetBitmap, self.microphone_off)
-
-    def _playback_status(self, status=None):
-        if status:
-            wx.CallAfter(self.safe_update, self._speaker_bmp.SetBitmap, self.speaker_on)
-        else:
-            wx.CallAfter(self.safe_update, self._speaker_bmp.SetBitmap, self.speaker_off)
-
-    def _synthesize_status(self, status=None):
-        if status:
-            wx.CallAfter(self.safe_update, self._speaker_bmp.SetBitmap, self.speaker_analyze)
-        else:
-            wx.CallAfter(self.safe_update, self._speaker_bmp.SetBitmap, self.speaker_off)
-
     def _system_response_text(self, text):
-        if self._error_msg.isSet():
-            wx.CallAfter(self.safe_update, self._system_response_bmp.SetBitmap, self.system_response_error)
-            self._error_msg.clear()
-        elif self._unclear_msg.isSet():
-            wx.CallAfter(self.safe_update, self._system_response_bmp.SetBitmap, self.system_response_bad)
-            self._unclear_msg.clear()
-        else:
-            wx.CallAfter(self.safe_update, self._system_response_bmp.SetBitmap, self.system_response_good)
-
         for stop_char in range(len(text) + 1):
             time.sleep(0.05)
             wx.CallAfter(self.safe_update, self._system_response_lbl.SetLabel, text[:stop_char])
         self.safe_update_delay(self._system_response_lbl.SetLabel, "")
-        self.safe_update_delay(self._system_response_bmp.SetBitmap, self.system_response_good)
 
     def _user_request_text(self, entities, raw_text):
         for stop_char in range(len(raw_text) + 1):
             time.sleep(0.05)
             wx.CallAfter(self.safe_update, self._user_request_lbl.SetLabel, "%150s" % raw_text[:stop_char])
         self.safe_update_delay(self._user_request_lbl.SetLabel, "")
-
-    def _say_status_update(self, response):
-        if "error" in str(response).lower():
-            self._error_msg.set()
-        elif "unclear" in str(response).lower():
-            self._unclear_msg.set()
 
     def _time_update(self):
         while not self._shutdown.isSet():

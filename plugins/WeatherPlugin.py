@@ -9,6 +9,7 @@ import urllib
 import time
 from bisect import bisect_left
 import dateutil.parser
+from uuid import uuid4
 
 import keyring
 from pydispatch import dispatcher
@@ -24,6 +25,7 @@ class Weather:
     def __init__(self):
         self._shutdown = threading.Event()
         self.weather_data = []
+        self.gui_status = str(uuid4())
         try:
             self._logger = logging.getLogger('moduleWeather')
         except ConfigParser.NoSectionError as e:
@@ -99,7 +101,9 @@ class Weather:
         time.sleep(15)
         while True:
             self._logger.debug("Requesting periodic update for city %s" % weather_data.city_name)
+            dispatcher.send(signal='GuiNotification', source=self.gui_status, icon_path="weather_none.png")
             weather_data.update()
+            dispatcher.send(signal='GuiNotification', source=self.gui_status, icon_path="")
             dispatcher.send(signal='WeatherUpdate',
                             description=weather_data.short_description,
                             temp=weather_data.temp,
@@ -143,6 +147,7 @@ class Weather:
         weather_data.icon_folder = self._temp_folder
         weather_data.city_name = city
         weather_data.request_time = unix_time
+        dispatcher.send(signal='GuiNotification', source=self.gui_status, icon_path="weather_none.png")
         try:
             weather_data.update()
         except IOError:
@@ -162,8 +167,11 @@ class Weather:
                 response = weather_data.description
 
             dispatcher.send(signal='SayText', text=response, callback=self.sythsys_complete)
+        finally:
+            dispatcher.send(signal='GuiNotification', source=self.gui_status, icon_path="")
 
-    def sythsys_complete(self):
+    @staticmethod
+    def sythsys_complete():
         dispatcher.send(signal='RestartInteraction')
 
 

@@ -10,6 +10,7 @@ import uuid
 import json
 import threading
 from time import sleep
+from uuid import uuid4
 
 from wit import Wit
 
@@ -24,6 +25,7 @@ class STT:
     ## @details Create STT instance
     def __init__(self):
         self._processing_accepted = threading.Event()
+        self.gui_recognize_uuid = str(uuid4())
         # Load logger
         try:
             self._logger = logging.getLogger('moduleSTT')
@@ -96,6 +98,7 @@ class STT:
     def _wav_analyze(self, filename):
         self._logger.debug('File record complete - filename %s' % filename)
         dispatcher.send(signal='SayResponse', response='Processing')
+        dispatcher.send(signal='GuiNotification', source=self.gui_recognize_uuid, icon_path="analyzing.png")
         # TODO - Remove silence
         try:
             resp = None
@@ -124,6 +127,8 @@ class STT:
                 dispatcher.send(signal='SayResponse', response='Unclear')
                 sleep(5)
                 dispatcher.send(signal='RestartInteraction')
+        finally:
+            dispatcher.send(signal='GuiNotification', source=self.gui_recognize_uuid, icon_path="")
 
     def restart_interaction(self):
         self._logger.debug('Restarting hot word detection')
