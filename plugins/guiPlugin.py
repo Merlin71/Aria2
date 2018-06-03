@@ -123,6 +123,7 @@ class Gui(wx.Frame):
     def __del__(self):
         self._logger.info('Module unload')
         self._shutdown.set()
+        self.Destroy()
         
     def __set_properties(self):
         # begin wxGlade: Gui.__set_properties
