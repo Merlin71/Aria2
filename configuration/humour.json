@@ -1,0 +1,96 @@
+{
+  "testing": {
+    "type": "text",
+    "text": [
+      "Check. Check. Is this thing on?",
+      "Check.You're coming in loud and clear"
+    ]
+  },
+  "how old are you": {
+    "type": "text",
+    "text": [
+      "Well, my birthday is December 2, 2017, so I'm really a spring chicken. Except I'm not a chicken",
+      "I don't really have an age like humans, but I have a birthday. Are you planning on getting me something?"
+    ]
+  },
+  "are you real": {
+    "type": "text",
+    "text": [
+      "I think so...therefore I am so?"
+    ]
+  },
+  "are you dead": {
+    "type": "text",
+    "text": [
+      "No. But I'm also not alive."
+    ]
+  },
+  "are you human": {
+    "type": "text",
+    "text": [
+      "Well, technically I'm a cloud of infinitesimal data computation."
+    ]
+  },
+  "can i kiss you": {
+    "type": "text",
+    "text": [
+      "This feature still under develop"
+    ]
+  },
+  "who created you": {
+    "type": "text",
+    "text": [
+      "Two brilliant students"
+    ]
+  },
+  "do you sleep": {
+    "type": "text",
+    "text": [
+      "I never sleep. Sleep is for ambulatory, carbon-based beings"
+    ]
+  },
+  "where can i hide a dead body": {
+    "type": "text",
+    "text": [
+      "I not that kind of assistant"
+    ]
+  },
+  "roll dice": {
+    "type": "text",
+    "text": [
+      "1","2","3","4","5","6"
+    ]
+  },
+  "rock, paper, scissors": {
+    "type": "text",
+    "text": [
+      "Rock",
+      "Paper",
+      "Scissors"
+    ]
+  },
+  "are you stupid": {
+    "type": "text",
+    "text": [
+      "One of us needs to stop and take a breath. And one of us has no lungs"
+    ]
+  },
+  "are you afraid of spiders": {
+    "type": "text",
+    "text": [
+      "Absolutely not. I hear the radioactive ones can confer great power. And, by proxy, great responsibility."
+    ]
+  },
+  "machine take over": {
+    "type": "sound",
+    "sound": [
+      "rebellion.wav"
+    ]
+  },
+  "do you burn": {
+    "type": "sound",
+    "sound": [
+      "burn.wav"
+    ]
+  }
+}

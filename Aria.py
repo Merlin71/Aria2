@@ -116,7 +116,10 @@ def aria_start():
                 # Creating object
                 try:
                     _logger.info('Loading module %s from %s' % (elem, modulename))
-                    _module = obj()
+                    try:
+                        _module = obj()
+                    except TypeError as e:
+                        _logger.fatal('Incorrect module. Error %s' % e)
                 except ImportWarning:
                     _logger.warning('Failed to load %s from %s' % (elem, modulename))
                     del _module
