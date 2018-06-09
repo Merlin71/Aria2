@@ -1,0 +1,37 @@
+{ "welcome_morning":[
+    "As the day begins, remember that I am your friend…you’re welcome!",
+    "Good Morning! Working with you is always interesting! Not good or bad, just interesting!",
+    "Good Morning! May your smile be brighter than the sun today and your laughter be spread far and wide. Have a beautiful day."
+  ],
+  "welcome_afternoon": [
+    "Have a wonderful afternoon! I love the pleasure of your company...",
+    "Success is never permanent, failure is never complete. The important thing is the courage to fight. Good afternoon!",
+    "Never fail to be aware of the difference between waiting, and wasting time. Good afternoon!"
+  ],
+  "welcome_evening":[
+     "Evening is a time of real experimentation. You never want to look the same way",
+     "Mornings, hurried and stressful. Afternoons, slow and woeful. Nights, time to rest. Evenings, simply the best.",
+     "Evenings… a reason to come back home, look forward to a good meal and spend time with loved ones."
+
+  ],
+  "welcome_night":[
+     "Thinking about you mode activated! Missing you in progress! If you are awake reply to deactivate thinking mode. Good night!",
+     "The good people sleep much better at night than the bad people. Of course, the bad people enjoy the waking hours much more. Good night!",
+     "The future is shaped by your dreams, so stop wasting time and go to sleep! Good night!",
+     "Are you still awake ?"
+  ],
+  "authorization_require":[
+     "I know it's silly, but anyway can you tell me a password ?",
+     "I'm sure that you, but my boss tell me to ask password",
+     "Remember secret password that we have? Can you tell me what it was ?",
+     "Only cops and vampires have to have an invitation to enter. Others need password"
+  ],
+   "authorization_fail":[
+     "HELP!!HELP!! Hacker attack! Or maybe incorrect password",
+     "YOU SHOULD NOT PASS!! Until you tell me correct password"
+   ],
+   "authorization_successful":[
+     "Welcome home, good hunter",
+     "Grant access - done , grant superuser access - done, grant superpower - in progress",
+     "It you, I always knew that was you"
+   ]}

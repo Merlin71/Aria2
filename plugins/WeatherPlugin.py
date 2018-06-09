@@ -41,7 +41,8 @@ class Weather:
             try:
                 self.api_key = keyring.get_password(api_system, api_user)
             except keyring.errors as e:
-                self._logger.warning('Fail to read OpenWeather token with error: %s. Refer to manual. Module unload' % e)
+                self._logger.warning(
+                    'Fail to read OpenWeather token with error: %s. Refer to manual. Module unload' % e)
                 raise ImportError
             if self.api_key is None:
                 self._logger.warning('Fail to read OpenWeather token. Refer to manual. Module unload')
@@ -75,8 +76,9 @@ class Weather:
         try:
             # register on user input
             dispatcher.connect(self.user_request, signal='SpeechRecognize', sender=dispatcher.Any)
+            dispatcher.connect(self.custom_request, signal='WeatherRequest', sender=dispatcher.Any)
         except dispatcher.DispatcherTypeError as e:
-            self._logger.error('Fail to subscribe on "SpeechRecognize" event with error %s.Module unload' % e)
+            self._logger.error('Fail to subscribe on eventswith error %s.Module unload' % e)
             raise ImportError
 
         self._logger.debug("Starting periodic update thread")
@@ -120,7 +122,7 @@ class Weather:
             dispatcher.send(signal='SpeechAccepted')
             self._logger.debug("Starting weather fetch thread")
             try:
-                threading.Thread(target=self._user_request, args=(entities, )).start()
+                threading.Thread(target=self._user_request, args=(entities,)).start()
             except OSError as e:
                 self._logger.warning('Fail to start fetch thread with error %s' % e)
 
@@ -170,6 +172,42 @@ class Weather:
         finally:
             dispatcher.send(signal='GuiNotification', source=self.gui_status, icon_path="")
 
+    def custom_request(self, callback, custom_object=None, request_time=None, request_city=None):
+        weather_data = WeatherData(self.api_key, self._logger)
+        weather_data.auto_update = False
+        weather_data.units = self._units
+        weather_data.icon_folder = self._temp_folder
+        # City
+        if request_city is None:
+            request_city = self._main_city
+        weather_data.city_name = request_city
+        # Time
+        weather_time = time.time()
+        if request_city is None:
+            weather_time = time.time()
+        elif str(request_time).lower() in 'today':
+            weather_time = time.time()
+        elif str(request_time).lower() in 'tomorrow':
+            weather_time = time.time() + 24 * 60 * 60
+        weather_data.request_time = weather_time
+        dispatcher.send(signal='GuiNotification', source=self.gui_status, icon_path="weather_none.png")
+        try:
+            weather_data.update()
+        except IOError:
+            callback(custom=custom_object,
+                     description='Error',
+                     temp='',
+                     wind='',
+                     icon='')
+        finally:
+            dispatcher.send(signal='GuiNotification', source=self.gui_status, icon_path="")
+
+        callback(custom=custom_object,
+                 description=weather_data.short_description,
+                 temp=weather_data.temp,
+                 wind=weather_data.wind_description,
+                 icon=weather_data.icon)
+
     @staticmethod
     def sythsys_complete():
         dispatcher.send(signal='RestartInteraction')
@@ -185,21 +223,21 @@ class WeatherData(object):
         self._units = None
 
         self.weather_data = dict(
-                title=None,
-                description=None,
-                icon=None,
-                temp=None,
-                temp_max=None,
-                temp_min=None,
-                pressure=None,
-                humidity=None,
-                wind_speed=None,
-                wind_direction=None,
-                rain=None,
-                snow=None,
-                clouds=None,
-                timestamp=None
-            )
+            title=None,
+            description=None,
+            icon=None,
+            temp=None,
+            temp_max=None,
+            temp_min=None,
+            pressure=None,
+            humidity=None,
+            wind_speed=None,
+            wind_direction=None,
+            rain=None,
+            snow=None,
+            clouds=None,
+            timestamp=None
+        )
         self._base_url = "http://api.openweathermap.org/data/2.5/"
         self._icon_url = "http://openweathermap.org/img/w/"
         self._icon_folder = ""
@@ -208,7 +246,7 @@ class WeatherData(object):
         if self._city_name is None:
             return
         # construct url
-        if (self._requested_time is None) or (abs(time .time() - self._requested_time) < 3 * 60 * 60):
+        if (self._requested_time is None) or (abs(time.time() - self._requested_time) < 3 * 60 * 60):
             # request current weather
             request_url = self._base_url + "find?q=%s" % self._city_name
             forecast = False
@@ -298,7 +336,6 @@ class WeatherData(object):
             else:
                 self.weather_data['icon'] = os.path.join(self.icon_folder, self.weather_data['icon'] + ".png")
 
-
     @property
     def base_url(self):
         return self._base_url
@@ -342,7 +379,7 @@ class WeatherData(object):
         self._city_name = name
         self._logger.debug("City updated - %s" % name)
         if self._auto_update:
-                self.update()
+            self.update()
 
     @property
     def auto_update(self):
@@ -437,7 +474,7 @@ class WeatherData(object):
         description = ""
         wind_direction = {0: 'northerly', 45: 'northeasterly', 90: 'easterly', 135: 'southeasterly',
                           180: 'southerly', 225: 'southwesterly', 270: 'westerly', 315: 'Northwesterly'}
-        
+
         if self.wind_direction is not None:
             wind_direction_description = wind_direction[min(wind_direction, key=lambda x: abs(x - self.wind_direction))]
 
@@ -506,12 +543,3 @@ class WeatherData(object):
         if "without" not in wind:
             desc = desc + " with %s" % wind
         return desc
-
-
-
-
-
-
-
-
-
