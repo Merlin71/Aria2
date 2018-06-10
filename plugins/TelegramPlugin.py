@@ -9,6 +9,10 @@ import datetime
 import json
 import random
 from uuid import uuid4
+import os
+
+from PIL import Image, ImageFont, ImageDraw
+
 
 import telegram.ext
 import telegram
@@ -25,10 +29,11 @@ class TelegramBot:
     description = 'Telegram bot'
 
     def __init__(self):
-        self.gui_status = str(uuid4())
+        self.notify_gui_status = str(uuid4())
+        self.camera_gui_status = str(uuid4())
         self._shutdown = threading.Event()
         self._user_status = dict()
-        self._update_lock = threading.Lock()
+        self._activity_event = threading.Event()
 
         try:
             self._logger = logging.getLogger('moduleTelegram')
@@ -43,6 +48,7 @@ class TelegramBot:
             api_system = self._config.get('API', 'system')
             api_user = self._config.get('API', 'user')
             login_name = self._config.get('API', 'login')
+            self._camera_angle = self._config.getfloat('Camera', 'angle')
 
             with open("./configuration/telegram_messages.json", "r") as data_file:
                 self.response = json.load(data_file)
@@ -80,6 +86,8 @@ class TelegramBot:
         self._bot_update.dispatcher.add_handler(telegram.ext.CommandHandler("help", self.help))
         self._bot_update.dispatcher.add_handler(telegram.ext.CommandHandler("get_weather", self.get_weather))
         self._bot_update.dispatcher.add_handler(telegram.ext.CommandHandler("get_picture", self.get_picture))
+        self._bot_update.dispatcher.add_handler(telegram.ext.CommandHandler("say", self.say_text))
+        self._bot_update.dispatcher.add_handler(telegram.ext.CommandHandler("who_home", self.who_home))
 
         # Unknown command
         self._bot_update.dispatcher.add_handler(
@@ -88,6 +96,14 @@ class TelegramBot:
         # Unknown command
         self._bot_update.dispatcher.add_handler(
             telegram.ext.MessageHandler(telegram.ext.Filters.text, self.text_handler))
+
+        self._temp_folder = self._config.get('System', 'temp_folder')
+        if not os.path.exists(self._temp_folder):
+            try:
+                os.makedirs(self._temp_folder)
+            except IOError as e:
+                self._logger.error('Fail to temporary folder with error %s.Module unload' % e)
+                raise ImportError
 
         # Security camera
         self._camera = picamera.PiCamera()
@@ -99,13 +115,24 @@ class TelegramBot:
             self._logger.warning('Fail to start periodic update thread with error %s' % e)
             raise ImportError
 
+        threading.Thread(target=self._activity_update).start()
+
         self._logger.info('Telegram bot module ready')
 
     def __del__(self):
         self._logger.info('Stop Telegram module')
         self._bot_update.stop()
 
+    def _activity_update(self):
+        while not self._shutdown.isSet():
+            if self._activity_event.wait(10):
+                dispatcher.send(signal='GuiNotification', source=self.notify_gui_status, icon_path="telegram.png")
+                self._activity_event.clear()
+            else:
+                dispatcher.send(signal='GuiNotification', source=self.notify_gui_status, icon_path="")
+
     def start(self, bot, update):
+        self._activity_event.set()
         if 6 <= datetime.datetime.now().hour < 12:
             message = random.choice(self.response['welcome_morning'])
         elif 12 <= datetime.datetime.now().hour < 18:
@@ -123,7 +150,9 @@ class TelegramBot:
                                                            "active_state":None}
             update.message.reply_text(random.choice(self.response['authorization_require']))
 
+
     def help(self, bot, update):
+        self._activity_event.set()
         update.message.reply_text("Supported command /get_picture and /get_weather")
 
     def if_authorized(self, user_id, update):
@@ -136,7 +165,7 @@ class TelegramBot:
             return False
 
     def text_handler(self, bot, update):
-        print
+        self._activity_event.set()
         if update.effective_user.id not in self._user_status:
             # new user
             self._logger.info("New user login - Name %s, ID-%s" % (update.effective_user.full_name,
@@ -156,7 +185,7 @@ class TelegramBot:
                                   (update.effective_user.full_name, update.effective_user.id))
                 update.message.reply_text(random.choice(self.response['authorization_fail']))
         elif self._user_status[update.effective_user.id]["active_state"] == "city_name":
-            custom_keyboard = [['Today'], ['Tomorrow']]
+            custom_keyboard = [['Today'], ['Tomorrow'], []]
             reply_markup = telegram.ReplyKeyboardMarkup(custom_keyboard)
             update.message.reply_text(text="Select when forecast is needed", reply_markup=reply_markup)
             self._user_status[update.effective_user.id]["active_state"] = "weather_time"
@@ -175,22 +204,46 @@ class TelegramBot:
                                 callback=self._weather_update, custom_object=update, request_time='today',
                                 request_city=self._user_status[update.effective_user.id]["weather_city"])
             self._user_status[update.effective_user.id]["active_state"] = None
+        elif self._user_status[update.effective_user.id]["active_state"] == "say_text":
+            dispatcher.send(signal='SayText', text=update.message.text)
         else:
             print update.message.text
 
-    def get_picture(self, bot, update):
+    def say_text(self, bot, update):
+        self._activity_event.set()
         if not self.if_authorized(update.effective_user.id, update):
             return
-        self._camera.capture('test.jpg')
-        bot.send_photo(chat_id=update.message.chat_id, photo=open('test.jpg', 'rb'))
+        update.message.reply_text("What do you want that I say ?")
+        self._user_status[update.effective_user.id]["active_state"] = "say_text"
+
+    def who_home(self, bot, update):
+        pass
+
+    def get_picture(self, bot, update):
+        self._activity_event.set()
+        if not self.if_authorized(update.effective_user.id, update):
+            return
+        dispatcher.send(signal='GuiNotification', source=self.camera_gui_status, icon_path="camera.png")
+        self._camera.capture(os.path.join(self._temp_folder, "raw.jpg"))
+        raw_pic = Image.open(os.path.join(self._temp_folder, "raw.jpg"))
+        post_img = raw_pic.rotate(self._camera_angle, expand=True)
+        draw = ImageDraw.Draw(post_img)
+        font = ImageFont.load_default()
+        draw.text((0, 0), str(datetime.datetime.now()), (255, 255, 255), font=font)
+
+        post_img.save(os.path.join(self._temp_folder, "process.jpg"))
+        bot.send_photo(chat_id=update.message.chat_id, photo=open(os.path.join(self._temp_folder, "process.jpg"), 'rb'))
+        dispatcher.send(signal='GuiNotification', source=self.camera_gui_status, icon_path="")
 
     def get_weather(self, bot, update):
+        self._activity_event.set()
         if not self.if_authorized(update.effective_user.id, update):
             return
         update.message.reply_text("Where you want know the weather? Write down a city name")
         self._user_status[update.effective_user.id]["active_state"] = "city_name"
 
     def unknown(self, bot, update):
+        self._activity_event.set()
         bot.send_message(chat_id=update.message.chat_id, text="Sorry, I didn't understand that command.")
 
     def _weather_update(self, custom, description, temp, wind, icon):
@@ -199,15 +252,15 @@ class TelegramBot:
             custom.message.reply_text(emojize(":sob: Sorry, we have some error getting weather", use_aliases=True))
         else:
             if "clear" in str(description).lower():
-                custom.message.reply_text(emojize(":sunny: Weather is %s with temperature %02.1fC and wind %s" %
+                custom.message.reply_text(emojize(":sunny: Weather is %s with temperature %02.1fC and %s" %
                                                   (description, temp, wind), use_aliases=True))
             elif "cloud" in str(description).lower():
-                custom.message.reply_text(emojize(":cloud: Weather is %s with temperature %02.1fC and wind %s" %
+                custom.message.reply_text(emojize(":cloud: Weather is %s with temperature %02.1fC and %s" %
                                                   (description, temp, wind), use_aliases=True))
             elif "rain" in str(description).lower():
-                custom.message.reply_text(emojize(":umbrella: Weather is %s with temperature %02.1fC and wind %s" %
+                custom.message.reply_text(emojize(":umbrella: Weather is %s with temperature %02.1fC and %s" %
                                                   (description, temp, wind)))
             else:
-                custom.message.reply_text(emojize(":earth_africa: Weather is %s with temperature %02.1fC and wind %s" %
+                custom.message.reply_text(emojize(":earth_africa: Weather is %s with temperature %02.1fC and %s" %
                                                   (description, temp, wind), use_aliases=True))
 
