@@ -217,7 +217,17 @@ class TelegramBot:
         self._user_status[update.effective_user.id]["active_state"] = "say_text"
 
     def who_home(self, bot, update):
-        pass
+        dispatcher.send(signal='GetActiveUser', callback=self._who_response, custom_obj=update)
+
+    def _who_response(self, update, user):
+        self._activity_event.set()
+        if not self.if_authorized(update.effective_user.id, update):
+            return
+        send_str = "Active users:\n"
+        for single_user in user:
+            send_str += single_user + "\n"
+
+        update.message.reply_text(send_str)
 
     def get_picture(self, bot, update):
         self._activity_event.set()

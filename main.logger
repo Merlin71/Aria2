@@ -1,8 +1,8 @@
 [loggers]
-keys=root,moduleTTS,moduleSTT,Audio,moduleJoke,moduleWeather,moduleGui,moduleEmail,moduleTelegram
+keys=root,moduleTTS,moduleSTT,Audio,moduleJoke,moduleWeather,moduleGui,moduleEmail,moduleTelegram,moduleSpy
 
 [handlers]
-keys=consoleHandler,moduleTTS,moduleSTT,moduleJoke,moduleWeather,moduleEmail,moduleTelegram
+keys=consoleHandler,moduleTTS,moduleSTT,moduleJoke,moduleWeather,moduleEmail,moduleTelegram,moduleSpy
 
 [formatters]
 keys=consoleFormatter
@@ -58,6 +58,12 @@ level=DEBUG
 handlers=consoleHandler
 propagate=0
 qualname=moduleTelegram
+
+[logger_moduleSpy]
+level=DEBUG
+handlers=consoleHandler
+propagate=0
+qualname=moduleSpy
 #########################################################################
 [handler_consoleHandler]
 class=StreamHandler
@@ -108,6 +114,12 @@ formatter=consoleFormatter
 args=(sys.stdout,)
 
 [handler_moduleTelegram]
+class=StreamHandler
+level=DEBUG
+formatter=consoleFormatter
+args=(sys.stdout,)
+
+[handler_moduleSpy]
 class=StreamHandler
 level=DEBUG
 formatter=consoleFormatter
