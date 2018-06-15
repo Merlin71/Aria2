@@ -269,7 +269,7 @@ class Gui(wx.Frame):
 
     def _weather_display(self, description, temp, wind, icon):
         wx.CallAfter(self.safe_update, self.weather_desc_lbl.SetLabel, description)
-        wx.CallAfter(self.safe_update, self._weather_temp_lbl.SetLabel, "%02.1fᵒC" % temp)
+        wx.CallAfter(self.safe_update, self._weather_temp_lbl.SetLabel, "%02.1fC" % temp)
         wx.CallAfter(self.safe_update, self.weather_wind_lbl.SetLabel, "Wind: %s" % str(wind).replace(' ', '\n'))
         wx.CallAfter(self.safe_update, self._weather_icon.SetBitmap, wx.Bitmap(icon, wx.BITMAP_TYPE_ANY))
 

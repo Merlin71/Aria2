@@ -1,5 +1,6 @@
 ## @file
-## @brief Zoho email client plugin
+## @package Email subsystem plugin
+## @brief Zoho email communication sub-system
 
 import ConfigParser
 import logging
@@ -16,18 +17,37 @@ import keyring
 from pydispatch import dispatcher
 
 
-## @class Weather
-## @brief Interaction with openweathermap
-## @details Simple weather data retriever from openweather,ap site
+## @class ZohoEmail
+## @brief Email plugin
+## @details Communication with Zoho (https://www.zoho.com/) email and retrieve email using POP3 protocol
+
+
 class ZohoEmail:
+    ## @brief Plugin version
     version = '1.0.0.0'
+    ## @brief Plugin description
     description = 'Zoho email client module'
 
+    ## @brief Create Email interface instance
+    ## @details Create and initialize instance
+    ## @exception ImportError Configuration or IO system error - Module will be unloaded.
+    ## @par Registering on events:
+    # SpeechRecognize - User speech input.\n
+    #
+    ## @par Generate events:
+    # GuiNotification - GUI tray update.\n
+    #
+    ## @see GuiPlugin
+
     def __init__(self):
-        self.gui_status = str(uuid4())
+        ## @brief Unique id for try icon
+        self._gui_status = str(uuid4())
+        ## @brief Shutdown event - signal to all thread exit
         self._shutdown = threading.Event()
-        self.message_list = dict()
-        self.message_list_token = threading.Lock()
+        ## @brief Message list
+        self._message_list = dict()
+        ## @brief Message list synchronization object - allow thread safe update
+        self._message_list_token = threading.Lock()
         try:
             self._logger = logging.getLogger('moduleEmail')
         except ConfigParser.NoSectionError as e:
@@ -71,14 +91,28 @@ class ZohoEmail:
 
         self._logger.debug("Starting periodic update thread")
         try:
-            threading.Thread(target=self.periodic_update).start()
+            threading.Thread(target=self._periodic_update).start()
         except OSError as e:
             self._logger.warning('Fail to start periodic update thread with error %s' % e)
 
         self._logger.info('Weather module ready')
 
+    ## @brief Stop module
+    ## @details Stop all module thread and sub-programs
+    def __del__(self):
+        dispatcher.disconnect(self.user_request)
+        self._shutdown.set()
+        self._logger.debug('Email module release')
+
+    ## @brief Connect to email server
+    ## @details Connect and login to email server
+    ## @warning This function should not be called from outside
+    ## @par Generate events:
+    # GuiNotification - GUI tray update.\n
+    #
+    ## @see GuiPlugin
     def _connect(self):
-        dispatcher.send(signal='GuiNotification', source=self.gui_status, icon_path="email_refresh.png")
+        dispatcher.send(signal='GuiNotification', source=self._gui_status, icon_path="email_refresh.png")
         try:
             pop_conn = poplib.POP3_SSL(self._server_url, self._server_port)
 
@@ -90,18 +124,30 @@ class ZohoEmail:
                 self._logger.warning('Fail to connect.Please check password\username. Got response %s' % pass_response)
                 return None
         except poplib.error_proto as e:
-            dispatcher.send(signal='GuiNotification', source=self.gui_status, icon_path="email_error.png")
+            dispatcher.send(signal='GuiNotification', source=self._gui_status, icon_path="email_error.png")
             self._logger.warning("Fail to connect.Error %s" % e)
             return None
         except socket.error as e:
-            dispatcher.send(signal='GuiNotification', source=self.gui_status, icon_path="email_error.png")
+            dispatcher.send(signal='GuiNotification', source=self._gui_status, icon_path="email_error.png")
             self._logger.warning("Socket error %s" % e)
             return None
         else:
             self._logger.debug('Pass response %s' % pass_response)
             return pop_conn
 
-    def periodic_update(self):
+    ## @brief Wait to new emails
+    ## @details Refresh emails on email server
+    ## @warning This function should not be called from outside
+    ## @par Generate events:
+    # GuiNotification - GUI tray update.\n
+    # SpeechAccepted - Notify that module start process user request.\n
+    # RestartInteraction - Restart Hot-Word detection.\n
+    # SayText - Response to user request using TTS engine.\n
+    #
+    ## @see GuiPlugin
+    ## @see AudioSubSystem
+    ## @see TtsPlugin
+    def _periodic_update(self):
         time.sleep(15)
         pop_conn = None
         while pop_conn is None:
@@ -117,25 +163,25 @@ class ZohoEmail:
                 messages = [parser.Parser().parsestr(mssg) for mssg in messages]
                 new_message = False
 
-                self.message_list_token.acquire()
+                self._message_list_token.acquire()
 
                 for message in messages:
-                    if not (message['Message-ID'] in self.message_list):
+                    if not (message['Message-ID'] in self._message_list):
                         self._logger.info('New message found')
-                        self.message_list[str(message['Message-ID'])] = dict(Subject=str(message['Subject']),
-                                                                             From=str(message['From']),
-                                                                             Time=int(time.mktime(
+                        self._message_list[str(message['Message-ID'])] = dict(Subject=str(message['Subject']),
+                                                                              From=str(message['From']),
+                                                                              Time=int(time.mktime(
                                                                                  dateutil.parser.parse(
                                                                                      message['Date']).timetuple())))
-                        if time.time() - self.message_list[message['Message-ID']]['Time'] < (1 * 60 * 60):
+                        if time.time() - self._message_list[message['Message-ID']]['Time'] < (1 * 60 * 60):
                             new_message = True
 
-                self.message_list_token.release()
+                self._message_list_token.release()
 
                 if new_message:
-                    dispatcher.send(signal='GuiNotification', source=self.gui_status, icon_path="new_email.png")
+                    dispatcher.send(signal='GuiNotification', source=self._gui_status, icon_path="new_email.png")
                 else:
-                    dispatcher.send(signal='GuiNotification', source=self.gui_status, icon_path="")
+                    dispatcher.send(signal='GuiNotification', source=self._gui_status, icon_path="")
 
                 for i in range(0, 60 * self._update_interval, 30):
                     self._shutdown.wait(30)
@@ -156,6 +202,16 @@ class ZohoEmail:
                             pop_conn.quit()
                             return
 
+    ## @brief SpeechRecognize event wrapper
+    ## @details If user request contain email entity with high confidence begin request process
+    ## @warning This function should not be called from outside
+    ## @par Generate events:
+    # GuiNotification - GUI tray update.\n
+    #
+    ## @param entities dictionary Speech entities
+    ## @param raw_text string Ignored
+    ## @see GuiPlugin
+    ## @see TtsPlugin
     def user_request(self, entities, raw_text):
         if "mail" in entities and entities['mail'][0]['confidence'] > 0.5:
             dispatcher.send(signal='SpeechAccepted')
@@ -165,6 +221,16 @@ class ZohoEmail:
             except OSError as e:
                 self._logger.warning('Fail to start fetch thread with error %s' % e)
 
+    ## @brief Analyze user request
+    ## @details Extract data from user request and generate response
+    ## @warning This function should not be called from outside
+    ## @par Generate events:
+    # GuiNotification - GUI tray update.\n
+    # SayText - Response to user request using TTS engine.\n
+    #
+    ## @param entities dictionary Speech entities
+    ## @see GuiPlugin
+    ## @see TtsPlugin
     def _user_request(self, entities):
         if 'contact' in entities:
             if str(entities['contact'][0]['value']) != 'i':
@@ -177,8 +243,8 @@ class ZohoEmail:
         if search_person is None:
             # ask for update only
             new_email = 0
-            self.message_list_token.acquire()
-            for message_id, message_data in self.message_list.iteritems():
+            self._message_list_token.acquire()
+            for message_id, message_data in self._message_list.iteritems():
                 if (time.time() - message_data['Time']) < (1 * 60 * 60):
                     new_email += 1
             if new_email == 0:
@@ -189,8 +255,8 @@ class ZohoEmail:
                                 callback=self.sythsys_complete)
         else:
             new_email = 0
-            self.message_list_token.acquire()
-            for message_id, message_data in self.message_list.iteritems():
+            self._message_list_token.acquire()
+            for message_id, message_data in self._message_list.iteritems():
                 if ((time.time() - message_data['Time']) < (1 * 60 * 60)) and (search_person in message_data['From']):
                     new_email += 1
             if new_email == 0:
@@ -201,9 +267,16 @@ class ZohoEmail:
                 dispatcher.send(signal='SayText', text="You receive %i new email from %s in last hour" %
                                                        (new_email, search_person), callback=self.sythsys_complete)
 
-        self.message_list_token.release()
-        dispatcher.send(signal='GuiNotification', source=self.gui_status, icon_path="")
+        self._message_list_token.release()
+        dispatcher.send(signal='GuiNotification', source=self._gui_status, icon_path="")
 
+    ## @brief Restart user interaction
+    ## @details After request process restart hot-word detection process
+    ## @warning This function should not be called from outside
+    ## @par Generate events:
+    # RestartInteraction - estart Hot-Word detection.\n
+    #
+    ## @see SttPlugin
     @staticmethod
     def sythsys_complete():
         dispatcher.send(signal='RestartInteraction')

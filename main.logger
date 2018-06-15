@@ -1,3 +1,5 @@
+## @file
+# Main logger configuration file
 [loggers]
 keys=root,moduleTTS,moduleSTT,Audio,moduleJoke,moduleWeather,moduleGui,moduleEmail,moduleTelegram,moduleSpy
 
@@ -129,3 +131,5 @@ args=(sys.stdout,)
 [formatter_consoleFormatter]
 format=%(filename)-10s[LINE:%(lineno)-4d]# %(levelname)-8s [%(asctime)s]  %(message)s
 datefmt=%H:%M:%S
+
+

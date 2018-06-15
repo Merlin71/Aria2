@@ -35,12 +35,15 @@ def clean_exit():
 ## @fn def aria_start():
 ## @brief  Startup function
 ## @details Start all services and load runners
+## @note Load logger configuration, and run settings
+## @see https://docs.python.org/2/library/logging.html
 def aria_start():
     # Start reading _config file
     _config = ConfigParser.SafeConfigParser(allow_no_value=True)
     _config.read('./configuration/main.conf')
     # Setting up debug session
     try:
+        # Parse configuration options
         if _config.getboolean('Debug', 'Debug'):
             print 'Trying to start debug session.'
             _debug_host = _config.get('Debug', 'host').strip()
@@ -67,12 +70,15 @@ def aria_start():
     # Storing loaded modules
     active_modules = list()
     try:
+        # Search all files in plugin folder
         plugin_dir = _config.get('Modules', 'Path').strip()
         _logger.info('Searching modules in: %s' % plugin_dir)
     except IOError:
+        # Incorrect folder - Switching to default
         _logger.info('Error getting plugin dir using default - plugins')
         plugin_dir = 'plugins'
     try:
+        # Create list of disables modules and classes
         disable_modules = _config.get('Modules', 'Disabled')
         disable_modules = disable_modules.strip().split(',')
         disable_classes = _config.get('Classes', 'Disabled')
@@ -118,17 +124,20 @@ def aria_start():
                     _logger.info('Loading module %s from %s' % (elem, modulename))
                     try:
                         _module = obj()
-                    except TypeError as e:
+                    except (ImportError, TypeError) as e:
+                        # Some error while creating module instance
                         _logger.fatal('Incorrect module. Error %s' % e)
                 except ImportWarning:
                     _logger.warning('Failed to load %s from %s' % (elem, modulename))
                     del _module
                     pass
                 else:
+                    # Store module instance
                     _loaded_modules.append(_module)
                     _logger.info('Module %s (version: %s) loaded' % (elem, _module.version))
     sleep(5)  # Init time
     _logger.info('All modules loaded')
+    # Create event for shutdown of main thread
     dispatcher.connect(emergency_shutdown, signal='EmergencyShutdown')
     dispatcher.send(signal='SayResponse', response='Welcome')
     try:
@@ -145,17 +154,21 @@ def aria_start():
     for _module in _loaded_modules:
         try:
             _logger.info('Unloading module %s' % _module)
+            # Calling destructor will unload module
             del _module
         except:
+            # Ignore all error while shutdown
             _logger.warning('Fail to unload module %s' % _module)
     _logger.info("All module unloaded")
 
 
 def emergency_shutdown():
+    # Callback function of "EmergencyShutdown" event
     shutdown_flag.set()
 
 
 if __name__ == '__main__':
     # Shutdown flag
     shutdown_flag = threading.Event()
+    # Start main function
     aria_start()
