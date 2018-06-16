@@ -1,6 +1,23 @@
 #!/usr/bin/python
 ## @file
 ## @brief Main file
+## @mainpage Aria - Digital Assistant - Code documentation
+#
+## @section Dependencies
+# pydispatch - http://pydispatcher.sourceforge.net/\n
+# pydev - http://www.pydev.org/\n
+# dateutil - https://dateutil.readthedocs.io/en/stable/\n
+# keyring - https://pypi.org/project/keyring/\n
+# facebook SDK - https://github.com/mobolic/facebook-sdk\n
+# telegram - https://github.com/python-telegram-bot/python-telegram-bot\n
+# emoji - https://github.com/carpedm20/emoji/\n
+#
+## @par Configuration file
+## @verbinclude ./configuration/main.conf
+#
+## @par Logger configuration
+## @verbinclude ./main.logger
+#
 
 import ConfigParser
 import atexit

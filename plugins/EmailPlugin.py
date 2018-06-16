@@ -1,7 +1,9 @@
 ## @file
-## @package Email subsystem plugin
 ## @brief Zoho email communication sub-system
-
+## @details Allow to comunicate with Zoho email server using POP3 protocol
+## par Configuration file
+## @verbinclude ./configuration/email.conf
+#
 import ConfigParser
 import logging
 import threading
@@ -20,8 +22,7 @@ from pydispatch import dispatcher
 ## @class ZohoEmail
 ## @brief Email plugin
 ## @details Communication with Zoho (https://www.zoho.com/) email and retrieve email using POP3 protocol
-
-
+## @version 1.0.0.0
 class ZohoEmail:
     ## @brief Plugin version
     version = '1.0.0.0'
@@ -37,7 +38,7 @@ class ZohoEmail:
     ## @par Generate events:
     # GuiNotification - GUI tray update.\n
     #
-    ## @see GuiPlugin
+    ## @see guiPlugin
 
     def __init__(self):
         ## @brief Unique id for try icon
@@ -49,6 +50,7 @@ class ZohoEmail:
         ## @brief Message list synchronization object - allow thread safe update
         self._message_list_token = threading.Lock()
         try:
+            ## @brief logger instance
             self._logger = logging.getLogger('moduleEmail')
         except ConfigParser.NoSectionError as e:
             print 'Fatal error  - fail to set logger.Error: %s ' % e.message
@@ -56,11 +58,14 @@ class ZohoEmail:
         self._logger.debug('Email logger started')
         # Reading config file
         try:
+            ## @brief configuration file intance
             self._config = ConfigParser.SafeConfigParser(allow_no_value=False)
             self._config.read('./configuration/email.conf')
             api_system = self._config.get('API', 'system')
+            ## @brief User name for email server
             self.api_user = self._config.get('API', 'user')
             try:
+                ## @brief Password for Email server
                 self.api_key = keyring.get_password(api_system, self.api_user)
             except keyring.errors as e:
                 self._logger.warning('Fail to read Zoho token with error: %s. Refer to manual. Module unload' % e)
@@ -69,10 +74,13 @@ class ZohoEmail:
                 self._logger.warning('Fail to read Zoho token. Refer to manual. Module unload')
                 raise ImportError
 
+            ## @brief Email list refresh interval
             self._update_interval = self._config.getint('General', 'update_interval')
 
             try:
+                ## @brief Zoho email sever URL
                 self._server_url = self._config.get('Server', 'url')
+                ## @brief Zoho email server communication protocol
                 self._server_port = self._config.getint('Server', 'port')
             except (ConfigParser.Error, ValueError):
                 self._server_url = 'pop.zoho.com'
@@ -110,7 +118,7 @@ class ZohoEmail:
     ## @par Generate events:
     # GuiNotification - GUI tray update.\n
     #
-    ## @see GuiPlugin
+    ## @see guiPlugin
     def _connect(self):
         dispatcher.send(signal='GuiNotification', source=self._gui_status, icon_path="email_refresh.png")
         try:
@@ -144,7 +152,7 @@ class ZohoEmail:
     # RestartInteraction - Restart Hot-Word detection.\n
     # SayText - Response to user request using TTS engine.\n
     #
-    ## @see GuiPlugin
+    ## @see guiPlugin
     ## @see AudioSubSystem
     ## @see TtsPlugin
     def _periodic_update(self):
@@ -210,7 +218,7 @@ class ZohoEmail:
     #
     ## @param entities dictionary Speech entities
     ## @param raw_text string Ignored
-    ## @see GuiPlugin
+    ## @see guiPlugin
     ## @see TtsPlugin
     def user_request(self, entities, raw_text):
         if "mail" in entities and entities['mail'][0]['confidence'] > 0.5:
@@ -229,7 +237,7 @@ class ZohoEmail:
     # SayText - Response to user request using TTS engine.\n
     #
     ## @param entities dictionary Speech entities
-    ## @see GuiPlugin
+    ## @see guiPlugin
     ## @see TtsPlugin
     def _user_request(self, entities):
         if 'contact' in entities:
@@ -274,7 +282,7 @@ class ZohoEmail:
     ## @details After request process restart hot-word detection process
     ## @warning This function should not be called from outside
     ## @par Generate events:
-    # RestartInteraction - estart Hot-Word detection.\n
+    # RestartInteraction - restart Hot-Word detection.\n
     #
     ## @see SttPlugin
     @staticmethod

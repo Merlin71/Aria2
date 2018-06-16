@@ -1,6 +1,9 @@
 ## @file
-## @package Audio subsystem plugin
 ## @brief Create instances for audio abstraction
+## @details Create abstraction layer for audio sub-system
+## par Configuration file
+## @verbinclude ./configuration/audio.conf
+#
 import ConfigParser
 import logging
 import subprocess
@@ -12,10 +15,9 @@ from pydispatch import dispatcher
 from uuid import uuid4
 
 ## @class AudioSubSystem
-## @brief AudioSubSystem plugin
+## @brief AudioSubSystem package
 ## @details Allow sound playing and recording
-
-
+## @version 1.0.0.0
 class AudioSubSystem:
     ## @brief Plugin version
     version = "1.0.0.0"
@@ -24,26 +26,26 @@ class AudioSubSystem:
 
     ## @brief Create Audio subsystem instance
     ## @details Create and initialize instance
-    ## @exception ImportError Configuration or IO system error - Module will be unloaded.
+    ## @exception ImportError Configuration or IO system errorModule will be unloaded.
     ## @par Registering on events:
-    # WaitToHotWord - Wait until Hot-Word not detected in audio input and send notification.\n
-    # PlayFile - Play audio file.\n
-    # RecordFile - Record audio input into file
+    # WaitToHotWordWait until Hot-Word not detected in audio input and send notification.\n
+    # PlayFilePlay audio file.\n
+    # RecordFileRecord audio input into file
     #
     ## @par Generate events:
-    # HotWordDetectionActive - Set to True when STT engine trying to detect hot-word in audio stream.\n
-    # GuiNotification - GUI tray update.\n
-    # HotWordDetected - Hot-word detected.
-    # PlaybackActive - Set to True when audio player play file.\n
-    # RecordActive - Set to True when audio recorder record audio into file.\n
+    # HotWordDetectionActiveSet to True when STT engine trying to detect hot-word in audio stream.\n
+    # GuiNotificationGUI tray update.\n
+    # HotWordDetectedHot-word detected.
+    # PlaybackActiveSet to True when audio player play file.\n
+    # RecordActiveSet to True when audio recorder record audio into file.\n
     #
 
     def __init__(self):
-        ## @brief Event object - allow synchronize audio file play/record and STT engine
+        ## @brief Event objectallow synchronize audio file play/record and STT engine
         self._hot_word_detection_active = threading.Event()
         ## @brief Allow bypass through Raspberry Pi IO system bug. Only one instance can control audio system
         self._io_system_busy = threading.Event()
-        ## @brief Shutdown event - signaling to all thread exit
+        ## @brief Shutdown eventsignaling to all thread exit
         self._exit_flag = threading.Event()
         ## @brief Unique id for speaker try icon
         self._gui_speaker_status_uuid = str(uuid4())
@@ -51,6 +53,7 @@ class AudioSubSystem:
         self._gui_microphone_status_uuid = str(uuid4())
         # Load logger
         try:
+            ## @brief logger instance
             self._logger = logging.getLogger('Audio')
         except ConfigParser.NoSectionError as e:
             print 'Fatal error  - fail to set logger.Error: %s ' % e.message
@@ -58,12 +61,14 @@ class AudioSubSystem:
         self._logger.debug('Audio sub-system logger started')
         # Reading config file
         try:
+            ## @brief configuration file instnce
             self._config = ConfigParser.SafeConfigParser(allow_no_value=True)
             self._config.read('./configuration/audio.conf')
         except ConfigParser.Error as e:
             self._logger.error('Fail to read configuration file with error %s.Module unload' % e)
             raise ImportError
         try:
+            ## @brief List of activate words
             self._hot_words = self._config.get('Activation', 'hot_words').split(';')
             engine = self._config.get('Activation', 'engine')
             command_line = self._config.get('Activation', 'options')
@@ -72,18 +77,21 @@ class AudioSubSystem:
             log_redirect = self._config.get('Activation', 'log_redirect')
             command_line = command_line.replace('$dict$', dictionary)
             command_line = command_line.replace('$lang$', lang_model)
+            ## @brief command line to activate hot-word detection engine
             self._recognition_engine = shlex.split(engine + ' ' + command_line + ' ' + log_redirect)
 
             playback_engine = self._config.get('Playback', 'engine')
             playback_option = self._config.get('Playback', 'options')
             playback_log_redirect = self._config.get('Playback', 'log_redirect')
+            ## @brief command line to activate file playback
             self._playback_engine = shlex.split(playback_engine + ' ' + playback_option + ' ' + playback_log_redirect)
 
             record_engine = self._config.get('Record', 'engine')
             record_option = self._config.get('Record', 'options')
             record_log_redirect = self._config.get('Record', 'log_redirect')
+            ## @brief Maximum allowed voice record time
             self._max_record_time = self._config.get('Record', 'max_record_time')
-
+            ## @brief command line to activate record engine
             self._record_engine = shlex.split(record_engine + ' ' + record_option + ' ' + record_log_redirect)
 
             if self._config.getboolean('Activation', 'auto_start'):
@@ -125,7 +133,7 @@ class AudioSubSystem:
 
     ## @brief WaitToHotWord event wrapper
     ## @details Initialize thread that allow to communication with STT engine
-    ## @param delay float Delay before start STT engine - optional. Default - 0
+    ## @param delay float Delay before start STT engineoptional. Default - 0
     def start_hot_word_detection(self, delay=None):
         if self._exit_flag.is_set():
             self._logger.warning('Shutdown flag set. Ignoring start command')
@@ -141,14 +149,14 @@ class AudioSubSystem:
 
     ## @brief WaitToHotWord thread
     ## @details Communicate with STT engine
-    ## @param delay float Delay before start STT engine - optional. Default - 0
+    ## @param delay float Delay before start STT engineoptional. Default - 0
     ## @warning This function should not be called from outside
     ## @par Generate events:
-    # HotWordDetectionActive - Set to True when STT engine trying to detect hot-word in audio stream.\n
-    # GuiNotification - GUI tray update.\n
-    # HotWordDetected - Hot-word detected.
+    # HotWordDetectionActiveSet to True when STT engine trying to detect hot-word in audio stream.\n
+    # GuiNotificationGUI tray update.\n
+    # HotWordDetectedHot-word detected.
     #
-    ## @see GuiPlugin
+    ## @see guiPlugin
     def _start_hot_word_detection(self, delay=None):
         if delay is not None:
             sleep(delay)
@@ -195,8 +203,8 @@ class AudioSubSystem:
     ## @brief PlayFile event wrapper
     ## @details Initialize thread that allow to communication audio player
     ## @param filename string Path to audio file
-    ## @param delay float Delay before start STT engine - optional. Default - 0
-    ## @param callback obj Callback function when playback completed - optional. Default - None
+    ## @param delay float Delay before start STT engine.Optional. Default - 0
+    ## @param callback obj Callback function when playback completed.Optional. Default - None
     def play_file(self, filename, delay=None, callback=None):
         if self._exit_flag.is_set():
             self._logger.warning('Shutdown flag set. Ignoring start command')
@@ -214,10 +222,10 @@ class AudioSubSystem:
     ## @param callback obj Callback function when playback completed - optional. Default - None
     ## @warning This function should not be called from outside
     ## @par Generate events:
-    # PlaybackActive - Set to True when audio player play file.\n
-    # GuiNotification - GUI tray update.
+    # PlaybackActiveSet to True when audio player play file.\n
+    # GuiNotificationGUI tray update.
     #
-    ## @see GuiPlugin
+    ## @see guiPlugin
     def _play_file(self, filename, delay=None, callback=None):
         if delay is not None:
             sleep(delay)
@@ -247,7 +255,7 @@ class AudioSubSystem:
     ## @brief RecordFile event wrapper
     ## @details Initialize thread that allow to communication audio recorder
     ## @param filename string Path to audio file
-    ## @param record_time float Record time - optional. Default - maximum allowed time as set in config file
+    ## @param record_time float Record timeoptional. Default - maximum allowed time as set in config file
     ## @param delay float Delay before start STT engine - optional. Default - 0
     ## @param callback obj Callback function when playback completed - optional. Default - None
     def record_file(self, filename, record_time=None, delay=None, callback=None):
@@ -275,7 +283,7 @@ class AudioSubSystem:
     # RecordActive - Set to True when audio recorder record audio into file.\n
     # GuiNotification - GUI tray update.
     #
-    ## @see GuiPlugin
+    ## @see guiPlugin
     def _record_file(self, filename, record_time, delay=None, callback=None):
         if delay is not None:
             sleep(delay)

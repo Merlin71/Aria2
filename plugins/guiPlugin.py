@@ -1,6 +1,10 @@
 # coding=utf-8
 ## @file
-## @brief GUI plugin
+## @brief GUIModule
+## @details Contain all gui function
+## @par Configuration file
+## @verbinclude ./configuration/gui.conf
+#
 import ConfigParser
 import logging
 from pydispatch import dispatcher
@@ -21,10 +25,27 @@ import wx
 ## @class Gui
 ## @brief Main GUI
 ## @details Create GUI interface with Facebook profile pictures
+## @see https://developers.facebook.com/tools/explorer/145634995501895/?method=GET&path=&version=v2.7
+## @version 1.0.0.0
 class Gui(wx.Frame):
+    ## @brief Create GUI based on wx python
+    ## @details Create and initialize instance start fetching and periodic update threads
+    ## @exception ImportError Configuration or IO system error - Module will be unloaded.
+    ## @par Registering on events:
+    # GuiNotification - User speech input.\n
+    # SayText - System to user response text.\n
+    # SpeechRecognize - User to system text.\n
+    # WeatherUpdate - Periodic weather update.\n
+    #
+    ## @see SttPlugin
+    ## @see WeatherPlugin
+    ## @see AudioSubSystem
     def __init__(self, *args, **kwds):
+        ## @brief Shutdown flag - notify to threads exits
         self._shutdown = threading.Event()
+        ## @brief GUI synchronization - avoid GUI update from different threads
         self._gui_update_lock = threading.Lock()
+        ## @brief dictionary of notification icons and their owners
         self._notification_tray = {}
         try:
             self._logger = logging.getLogger('moduleGui')
@@ -120,16 +141,26 @@ class Gui(wx.Frame):
             self._logger.error('Fail to start thread with error %s.Module unload' % e)
             raise ImportError
 
+    ## @brief Stop module
+    ## @details Stop all module thread and sub-programs
     def __del__(self):
         self._logger.info('Module unload')
         self._shutdown.set()
         self.Destroy()
-        
+
+    ## @brief Set GUI properties
+    ## @details Update GUI elements and their properties
+    ## @note This function generated create be WxGlade
+    ## @warning This function should not be called from outside
     def __set_properties(self):
         # begin wxGlade: Gui.__set_properties
         self.SetTitle("Aria")
         # end wxGlade
 
+    ## @brief Set GUI layout
+    ## @details Update GUI elements and their layouts
+    ## @note This function generated create be WxGlade
+    ## @warning This function should not be called from outside
     def __do_layout(self):
         # begin wxGlade: Gui.__do_layout
         sizer_1 = wx.BoxSizer(wx.VERTICAL)
@@ -205,18 +236,34 @@ class Gui(wx.Frame):
         self.Centre()
         # end wxGlade
 
+    ## @brief GUI element update
+    ## @details Thread safe GUI update
+    ## @param func - WxPython function
+    ## @param data - Configuration data for WxPython update function
     def safe_update(self, func, data):
         self._gui_update_lock.acquire()
         func(data)
         self._gui_update_lock.release()
 
+    ## @brief Wrapper for delayed GUI update
+    ## @details Thread safe GUI update with delay
+    ## @param func - WxPython function
+    ## @param data - Configuration data for WxPython update function
     def safe_update_delay(self, func, data):
         threading.Thread(target=self._safe_update_delay, args=(func, data)).start()
 
+    ## @brief Delayed GUI update
+    ## @details Thread safe GUI update with delay
+    ## @param func - WxPython function
+    ## @param data - Configuration data for WxPython update function
     def _safe_update_delay(self, func, data):
         time.sleep(self._clear_delay)
         wx.CallAfter(self.safe_update, func, data)
 
+    ## @brief Wrapper for tray update
+    ## @details Thread safe tray update
+    ## @param source - Unique id of caller
+    ## @param icon_path - Relative path of icon for tray
     def _notification(self, source, icon_path):
         if source in self._notification_tray:
             if icon_path == '':
@@ -237,7 +284,11 @@ class Gui(wx.Frame):
             self._notification_slots = self._notification_slots[1:]
             wx.CallAfter(self.safe_update, self._notification_tray[source].SetBitmap,
                          wx.Bitmap(os.path.join('./plugins/Icons/', icon_path), wx.BITMAP_TYPE_ANY))
-            
+
+    ## @brief Main picture animation
+    ## @details Create slow change effect of main picture
+    ## @warning This function should not be called from outside
+    ## @bug This function may cause high CPU load
     def _animation_update(self):
         bitmaps = []
         for single in range(30):
@@ -247,18 +298,27 @@ class Gui(wx.Frame):
                 time.sleep(self._animation_speed)
                 wx.CallAfter(self.safe_update, self._animation_circle_bmp.SetBitmap, single_frame)
 
+    ## @brief Wrapper for SayText event
+    ## @details Write TTS input text on screen with typing animation
+    ## @param text - Text to TTS engine
     def _system_response_text(self, text):
         for stop_char in range(len(text) + 1):
             time.sleep(0.05)
             wx.CallAfter(self.safe_update, self._system_response_lbl.SetLabel, text[:stop_char])
         self.safe_update_delay(self._system_response_lbl.SetLabel, "")
 
+    ## @brief Wrapper for SpeechRecognize event
+    ## @details Write STT output text on screen with typing animation
+    ## @param entities - Ignored
+    ## @param raw_text - Text from STT engine
     def _user_request_text(self, entities, raw_text):
         for stop_char in range(len(raw_text) + 1):
             time.sleep(0.05)
             wx.CallAfter(self.safe_update, self._user_request_lbl.SetLabel, "%150s" % raw_text[:stop_char])
         self.safe_update_delay(self._user_request_lbl.SetLabel, "")
 
+    ## @brief Time update
+    ## @details Update Time, and Date in GUI window
     def _time_update(self):
         while not self._shutdown.isSet():
             curr_time = datetime.datetime.now()
@@ -267,12 +327,21 @@ class Gui(wx.Frame):
             wx.CallAfter(self.safe_update, self._date_lbl.SetLabel, "%02d/%02d/%02d" %
                          (curr_time.day, curr_time.month, curr_time.year % 100))
 
+    ## @brief Wrapper for WeatherUpdate event
+    ## @details Display weather info in GUI
+    ## @param description - Short weather description
+    ## @param temp - Current temperature
+    ## @param wind - Short wind description
+    ## @param icon Path to weather icon. Provided by OpenWeatherMap
     def _weather_display(self, description, temp, wind, icon):
         wx.CallAfter(self.safe_update, self.weather_desc_lbl.SetLabel, description)
         wx.CallAfter(self.safe_update, self._weather_temp_lbl.SetLabel, "%02.1fC" % temp)
         wx.CallAfter(self.safe_update, self.weather_wind_lbl.SetLabel, "Wind: %s" % str(wind).replace(' ', '\n'))
         wx.CallAfter(self.safe_update, self._weather_icon.SetBitmap, wx.Bitmap(icon, wx.BITMAP_TYPE_ANY))
 
+    ## @brief Download image from Facebook
+    ## @details Download image for future processing (animation). Small images and ignored albums ignored
+    ## @bug Due to policy of Facebook application without server may use only short period access token
     def main_pic_animation(self):
         # TODO Add NORMAL access
         prev_pic = misc.imread("./plugins/Icons/login.png", False, 'RGB')
@@ -313,21 +382,26 @@ class Gui(wx.Frame):
                     self._shutdown.wait(self._change_after)
                     if self._shutdown.set():
                         return
-
-
-
-
 # end of class Gui
 
 
-
+## @class GuiPlugin
+## @brief Init wx-python GUI
+## @details Create GUI interface
+## @version 1.0.0.0
 class GuiPlugin:
+    ## @brief Plugin version
     version = '1.0.0.0'
+    ## @brief Plugin description
     description = 'GUI'
 
+    ## @brief Start GUI
+    ## @details Start GUI initialization in thread
     def __init__(self):
         threading.Thread(target=self._gui_thread).start()
 
+    ## @brief Initialize GUI
+    ## @details Create GUI frame and continue run in daemon thread mode
     def _gui_thread(self):
         gui = wx.PySimpleApp()
         frame = Gui(None, wx.ID_ANY, "")
